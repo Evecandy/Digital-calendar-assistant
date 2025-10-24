@@ -312,7 +312,11 @@ async function executeFunction(userId, functionCall) {
 app.get('/auth/google', (req, res) => {
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/calendar'],
+    scope: [
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile'
+    ],
   });
   res.redirect(authUrl);
 });
@@ -320,19 +324,39 @@ app.get('/auth/google', (req, res) => {
 app.get('/oauth2callback', async (req, res) => {
   const { code } = req.query;
   try {
+    // Step 1: Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
-    const userId = 'default_user'; // In production, use actual user ID from session
+    
+    // Step 2: Set credentials FIRST before making any API calls
+    oauth2Client.setCredentials(tokens);
+    
+    // Step 3: Now get user info with the credentials set
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+    const userId = userInfo.data.email; // Use email as unique user ID
+    
+    console.log(`✅ User authenticated: ${userId}`);
+    
+    // Step 4: Save tokens with user's email
     await saveUserTokens(userId, tokens);
-    res.redirect('/?connected=true');
+    
+    // Step 5: Redirect with userId
+    res.redirect(`/?connected=true&userId=${encodeURIComponent(userId)}`);
   } catch (error) {
-    console.error('OAuth error:', error);
+    console.error('OAuth error:', error.message);
     res.redirect('/?error=auth_failed');
   }
 });
 
 // Chat endpoint
 app.post('/chat', async (req, res) => {
-  const { message, userId = 'default_user' } = req.body;
+  const { message, userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ 
+      error: 'Please connect your Google account first by clicking "Connect Google Calendar"' 
+    });
+  }
   
   try {
     const model = genAI.getGenerativeModel({ 
