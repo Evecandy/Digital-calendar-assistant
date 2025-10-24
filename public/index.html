@@ -285,6 +285,9 @@
     </div>
 
     <script>
+        // Store userId in sessionStorage
+        let currentUserId = sessionStorage.getItem('userId') || null;
+
         function addMessage(content, isUser) {
             const chatContainer = document.getElementById('chatContainer');
             const messageDiv = document.createElement('div');
@@ -299,14 +302,14 @@
             countElement.textContent = `${count} appointment${count !== 1 ? 's' : ''}`;
         }
 
-        function updateGoogleConnectionStatus(isConnected) {
+        function updateGoogleConnectionStatus(isConnected, userEmail) {
             const btn = document.getElementById('googleConnectBtn');
             const btnText = document.getElementById('connectBtnText');
             const indicator = document.getElementById('statusIndicator');
             
             if (isConnected) {
                 btn.classList.add('connected');
-                btnText.textContent = '✓ Google Calendar Connected';
+                btnText.textContent = userEmail ? `✓ Connected as ${userEmail}` : '✓ Google Calendar Connected';
                 indicator.classList.add('connected');
             } else {
                 btn.classList.remove('connected');
@@ -320,6 +323,12 @@
             const message = input.value.trim();
             
             if (!message) return;
+
+            // Check if user is connected
+            if (!currentUserId) {
+                addMessage('⚠️ Please connect your Google account first by clicking "Connect Google Calendar" button above.', false);
+                return;
+            }
 
             const sendBtn = document.getElementById('sendBtn');
             const loading = document.getElementById('loading');
@@ -336,7 +345,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ message, userId: currentUserId })
                 });
 
                 const data = await response.json();
@@ -346,7 +355,7 @@
                 } else {
                     addMessage(data.response, false);
                     updateAppointmentCount(data.appointments);
-                    updateGoogleConnectionStatus(data.googleConnected);
+                    updateGoogleConnectionStatus(data.googleConnected, currentUserId);
                 }
             } catch (error) {
                 addMessage('❌ Connection error. Please check if the server is running.', false);
@@ -367,15 +376,25 @@
         // Load appointment count and check Google connection on start
         async function loadAppointments() {
             try {
-                const response = await fetch('/appointments');
-                const data = await response.json();
-                updateAppointmentCount(data.appointments.length);
-                updateGoogleConnectionStatus(data.googleConnected);
-                
-                // Check URL params for connection status
+                // Check URL params for userId after OAuth
                 const urlParams = new URLSearchParams(window.location.search);
+                const userIdFromUrl = urlParams.get('userId');
+                
+                if (userIdFromUrl) {
+                    currentUserId = userIdFromUrl;
+                    sessionStorage.setItem('userId', userIdFromUrl);
+                }
+                
+                if (currentUserId) {
+                    const response = await fetch(`/appointments?userId=${encodeURIComponent(currentUserId)}`);
+                    const data = await response.json();
+                    updateAppointmentCount(data.appointments.length);
+                    updateGoogleConnectionStatus(data.googleConnected, currentUserId);
+                }
+                
+                // Check connection status
                 if (urlParams.get('connected') === 'true') {
-                    addMessage('✅ Successfully connected to Google Calendar! Your appointments will now sync automatically.', false);
+                    addMessage(`✅ Successfully connected as ${currentUserId}! Your appointments will now sync with Google Calendar.`, false);
                     // Clean up URL
                     window.history.replaceState({}, document.title, '/');
                 } else if (urlParams.get('error') === 'auth_failed') {

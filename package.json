@@ -15,7 +15,7 @@
     "@google/generative-ai": "^0.24.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "googleapis": "^164.0.0",
+    "googleapis": "^164.1.0",
     "mongodb": "5.5",
     "node-cron": "^4.2.1"
   }
