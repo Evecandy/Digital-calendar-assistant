@@ -121,7 +121,7 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 GOOGLE_REDIRECT_URI=http://localhost:3000/oauth2callback
 
 # MongoDB
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/calendar-assistant?retryWrites=true&w=majority
+MONGODB_URI=
 
 # Server
 PORT=3000
